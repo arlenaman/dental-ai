@@ -17,5 +17,11 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = "dev-app-secret-change-me"
     whatsapp_api_base_url: str = "https://graph.facebook.com/v21.0"
 
+    anthropic_api_key: str = ""
+    # Sonnet 5: near-Opus quality on tool-calling/agentic tasks (which is
+    # what a booking/FAQ bot mostly does) at ~40% of the cost. Bump to
+    # claude-opus-4-8 if live dialogs show it struggling on edge cases.
+    anthropic_model: str = "claude-sonnet-5"
+
 
 settings = Settings()

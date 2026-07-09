@@ -1,3 +1,5 @@
+import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -7,6 +9,14 @@ from app.models.message import Message, MessageDirection
 from app.models.whatsapp_account import WhatsAppAccount
 from app.services.patients import find_or_create_patient
 from app.services.whatsapp.conversations import find_or_create_open_conversation
+
+
+@dataclass
+class InboundMessageResult:
+    message: Message
+    clinic_id: uuid.UUID
+    conversation_id: uuid.UUID
+    patient_id: uuid.UUID
 
 
 async def _get_account_by_phone_number_id(
@@ -21,14 +31,19 @@ async def _get_account_by_phone_number_id(
     return result.scalar_one_or_none()
 
 
-async def process_webhook_payload(db: AsyncSession, payload: dict) -> list[Message]:
+async def process_webhook_payload(
+    db: AsyncSession, payload: dict
+) -> list[InboundMessageResult]:
     """Parse a Meta Cloud API webhook payload and persist inbound text messages.
 
     Non-text messages (images, statuses/delivery receipts, etc.) and messages
     from unregistered phone_number_ids are silently skipped rather than
     erroring, per Meta's webhook contract (always return 200 quickly).
+
+    Returns one result per newly created inbound message, so the caller can
+    trigger an AI reply for each.
     """
-    created_messages: list[Message] = []
+    created: list[InboundMessageResult] = []
 
     for entry in payload.get("entry", []):
         for change in entry.get("changes", []):
@@ -78,7 +93,14 @@ async def process_webhook_payload(db: AsyncSession, payload: dict) -> list[Messa
                 )
                 db.add(message)
                 conversation.last_message_at = datetime.now(timezone.utc)
-                created_messages.append(message)
+                created.append(
+                    InboundMessageResult(
+                        message=message,
+                        clinic_id=account.clinic_id,
+                        conversation_id=conversation.id,
+                        patient_id=patient.id,
+                    )
+                )
 
     await db.commit()
-    return created_messages
+    return created

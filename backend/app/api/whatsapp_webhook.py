@@ -1,10 +1,11 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.session import get_db
+from app.services.ai_agent.reply import generate_and_send_reply
 from app.services.whatsapp.inbound import process_webhook_payload
 from app.services.whatsapp.security import verify_signature
 
@@ -23,7 +24,11 @@ async def verify_webhook(
 
 
 @router.post("")
-async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+async def receive_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     raw_body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256")
 
@@ -31,7 +36,14 @@ async def receive_webhook(request: Request, db: AsyncSession = Depends(get_db)) 
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
 
     payload = json.loads(raw_body)
-    await process_webhook_payload(db, payload)
+    new_messages = await process_webhook_payload(db, payload)
+
+    for result in new_messages:
+        background_tasks.add_task(
+            generate_and_send_reply, result.clinic_id, result.conversation_id, result.patient_id
+        )
+
     # Meta requires a fast 200 OK regardless of processing outcome, or it will
-    # retry aggressively and eventually disable the webhook subscription.
+    # retry aggressively and eventually disable the webhook subscription. The
+    # AI reply runs as a background task, after this response is sent.
     return {"status": "ok"}

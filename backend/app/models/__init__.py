@@ -1,6 +1,7 @@
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.base import Base
 from app.models.clinic import Clinic
+from app.models.clinic_faq_entry import ClinicFaqEntry
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.message import Message, MessageDirection
 from app.models.patient import Patient
@@ -14,6 +15,7 @@ __all__ = [
     "AppointmentStatus",
     "Base",
     "Clinic",
+    "ClinicFaqEntry",
     "Conversation",
     "ConversationStatus",
     "Message",
