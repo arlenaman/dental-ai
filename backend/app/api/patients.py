@@ -1,7 +1,6 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_staff
@@ -9,6 +8,7 @@ from app.db.session import get_db
 from app.models.patient import Patient
 from app.models.staff import Staff
 from app.schemas.patient import PatientCreate, PatientOut
+from app.services.patients import find_or_create_patient as find_or_create_patient_service
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -19,22 +19,13 @@ async def find_or_create_patient(
     current_staff: Staff = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> Patient:
-    result = await db.execute(
-        select(Patient).where(
-            Patient.clinic_id == current_staff.clinic_id, Patient.phone == payload.phone
-        )
-    )
-    patient = result.scalar_one_or_none()
-    if patient is not None:
-        return patient
-
-    patient = Patient(
-        clinic_id=current_staff.clinic_id,
+    patient = await find_or_create_patient_service(
+        db,
+        current_staff.clinic_id,
+        payload.phone,
         full_name=payload.full_name,
-        phone=payload.phone,
         preferred_language=payload.preferred_language,
     )
-    db.add(patient)
     await db.commit()
     await db.refresh(patient)
     return patient

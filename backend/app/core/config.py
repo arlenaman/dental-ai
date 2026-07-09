@@ -11,5 +11,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24
 
+    # Meta app-level settings (shared across all clinics' WhatsApp numbers,
+    # since all tenants attach their number to the same registered Meta App).
+    whatsapp_webhook_verify_token: str = "dev-verify-token-change-me"
+    whatsapp_app_secret: str = "dev-app-secret-change-me"
+    whatsapp_api_base_url: str = "https://graph.facebook.com/v21.0"
+
 
 settings = Settings()
