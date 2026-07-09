@@ -1,0 +1,31 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: dental_ai
+      POSTGRES_PASSWORD: dental_ai
+      POSTGRES_DB: dental_ai_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - dental_ai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dental_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ../backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dental_ai:dental_ai@db:5432/dental_ai_dev
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../backend:/app
+
+volumes:
+  dental_ai_pgdata:
