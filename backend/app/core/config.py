@@ -23,5 +23,11 @@ class Settings(BaseSettings):
     # claude-opus-4-8 if live dialogs show it struggling on edge cases.
     anthropic_model: str = "claude-sonnet-5"
 
+    cors_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
 
 settings = Settings()

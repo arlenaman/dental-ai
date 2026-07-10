@@ -14,12 +14,13 @@ from app.api.staff import router as staff_router
 from app.api.whatsapp_accounts import router as whatsapp_accounts_router
 from app.api.whatsapp_webhook import router as whatsapp_webhook_router
 from app.api.working_hours import router as working_hours_router
+from app.core.config import settings
 
 app = FastAPI(title="Dental AI Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
