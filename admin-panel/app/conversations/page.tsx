@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
+import { Badge, Card, EmptyState, Input, PageSpinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Conversation } from "@/lib/types";
 
@@ -18,42 +19,65 @@ function formatDate(iso: string | null) {
 
 export default function ConversationsPage() {
   const [conversations, setConversations] = useState<Conversation[] | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     api.get<Conversation[]>("/conversations").then(setConversations);
   }, []);
 
-  return (
-    <ProtectedLayout>
-      <h1 className="mb-6 text-lg font-semibold text-neutral-900">Диалоги с пациентами</h1>
+  const filtered = useMemo(() => {
+    if (!conversations) return null;
+    const q = search.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter(
+      (c) => c.patient_name.toLowerCase().includes(q) || c.patient_phone.includes(q),
+    );
+  }, [conversations, search]);
 
-      {conversations === null && <p className="text-sm text-neutral-500">Загрузка…</p>}
-      {conversations?.length === 0 && (
-        <p className="text-sm text-neutral-500">Пока нет ни одного диалога.</p>
+  return (
+    <ProtectedLayout title="Диалоги с пациентами">
+      <div className="mb-4">
+        <Input
+          placeholder="Поиск по имени или телефону…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+
+      {conversations === null && <PageSpinner />}
+
+      {filtered && filtered.length === 0 && (
+        <EmptyState
+          title={search ? "Ничего не найдено" : "Пока нет ни одного диалога"}
+        />
       )}
 
-      <div className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-        {conversations?.map((c) => (
-          <Link
-            key={c.id}
-            href={`/conversations/${c.id}`}
-            className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-neutral-50"
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-neutral-900">{c.patient_name}</span>
-                <span className="text-xs text-neutral-400">{c.patient_phone}</span>
+      {filtered && filtered.length > 0 && (
+        <Card className="divide-y divide-border">
+          {filtered.map((c) => (
+            <Link
+              key={c.id}
+              href={`/conversations/${c.id}`}
+              className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-2"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-text">{c.patient_name}</span>
+                  <span className="text-xs text-text-muted">{c.patient_phone}</span>
+                  {c.status === "closed" && <Badge variant="neutral">Закрыт</Badge>}
+                </div>
+                <p className="truncate text-sm text-text-muted">
+                  {c.last_message_preview ?? "Нет сообщений"}
+                </p>
               </div>
-              <p className="truncate text-sm text-neutral-500">
-                {c.last_message_preview ?? "Нет сообщений"}
-              </p>
-            </div>
-            <span className="shrink-0 text-xs text-neutral-400">
-              {formatDate(c.last_message_at)}
-            </span>
-          </Link>
-        ))}
-      </div>
+              <span className="shrink-0 text-xs text-text-muted">
+                {formatDate(c.last_message_at)}
+              </span>
+            </Link>
+          ))}
+        </Card>
+      )}
     </ProtectedLayout>
   );
 }

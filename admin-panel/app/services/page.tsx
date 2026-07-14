@@ -2,38 +2,57 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Input,
+  Modal,
+  PageSpinner,
+  useToast,
+} from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Service } from "@/lib/types";
 
-export default function ServicesPage() {
-  const [services, setServices] = useState<Service[] | null>(null);
-  const [name, setName] = useState("");
-  const [duration, setDuration] = useState("30");
-  const [price, setPrice] = useState("");
+function ServiceForm({
+  onClose,
+  onSaved,
+  service,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+  service: Service | null;
+}) {
+  const { show } = useToast();
+  const [name, setName] = useState(service?.name ?? "");
+  const [duration, setDuration] = useState(service ? String(service.duration_minutes) : "30");
+  const [price, setPrice] = useState(service ? String(service.price_amount) : "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function reload() {
-    api.get<Service[]>("/services").then(setServices);
-  }
-
-  useEffect(reload, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      await api.post("/services", {
+      const payload = {
         name,
         duration_minutes: Number(duration),
         price_amount: Number(price),
         price_currency: "KZT",
-      });
-      setName("");
-      setDuration("30");
-      setPrice("");
-      reload();
+      };
+      if (service) {
+        await api.patch(`/services/${service.id}`, payload);
+        show("Услуга обновлена", "success");
+      } else {
+        await api.post("/services", payload);
+        show("Услуга добавлена", "success");
+      }
+      onSaved();
+      onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось сохранить услугу");
     } finally {
@@ -41,89 +60,156 @@ export default function ServicesPage() {
     }
   }
 
-  async function toggleActive(service: Service) {
-    await api.patch(`/services/${service.id}`, { is_active: !service.is_active });
-    reload();
+  return (
+    <form onSubmit={handleSubmit}>
+      <Field label="Название">
+        <Input required value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Длительность (мин)">
+          <Input
+            type="number"
+            required
+            min={5}
+            max={480}
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
+        </Field>
+        <Field label="Цена (KZT)">
+          <Input
+            type="number"
+            required
+            min={0}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+        </Field>
+      </div>
+      {error && <p className="mb-4 text-sm text-danger">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onClose}>
+          Отмена
+        </Button>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Сохраняем…" : "Сохранить"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ServiceFormModal({
+  open,
+  onClose,
+  onSaved,
+  service,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  service: Service | null;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={service ? "Редактировать услугу" : "Новая услуга"}>
+      {open && <ServiceForm onClose={onClose} onSaved={onSaved} service={service} />}
+    </Modal>
+  );
+}
+
+export default function ServicesPage() {
+  const { show } = useToast();
+  const [services, setServices] = useState<Service[] | null>(null);
+  const [formTarget, setFormTarget] = useState<Service | null | "new">(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<Service | null>(null);
+
+  function reload() {
+    api.get<Service[]>("/services").then(setServices);
+  }
+
+  useEffect(reload, []);
+
+  async function activate(service: Service) {
+    try {
+      await api.patch(`/services/${service.id}`, { is_active: true });
+      reload();
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : "Не удалось включить услугу", "error");
+    }
+  }
+
+  async function deactivate() {
+    if (!deactivateTarget) return;
+    try {
+      await api.patch(`/services/${deactivateTarget.id}`, { is_active: false });
+      show("Услуга отключена", "success");
+      reload();
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : "Не удалось отключить услугу", "error");
+    }
   }
 
   return (
-    <ProtectedLayout>
-      <h1 className="mb-6 text-lg font-semibold text-neutral-900">Услуги клиники</h1>
+    <ProtectedLayout
+      title="Услуги клиники"
+      actions={<Button onClick={() => setFormTarget("new")}>+ Новая услуга</Button>}
+    >
+      {services === null && <PageSpinner />}
 
-      <div className="mb-8 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-        {services?.map((s) => (
-          <div key={s.id} className="flex items-center justify-between px-4 py-3">
-            <div>
-              <span className="font-medium text-neutral-900">{s.name}</span>
-              <span className="ml-2 text-sm text-neutral-500">
-                {s.duration_minutes} мин · {s.price_amount} {s.price_currency}
-              </span>
+      {services && services.length === 0 && (
+        <EmptyState title="Услуг пока нет" description="Добавьте первую услугу клиники." />
+      )}
+
+      {services && services.length > 0 && (
+        <Card className="divide-y divide-border">
+          {services.map((s) => (
+            <div key={s.id} className="flex items-center justify-between gap-4 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-text">{s.name}</span>
+                <span className="text-sm text-text-muted">
+                  {s.duration_minutes} мин · {s.price_amount} {s.price_currency}
+                </span>
+                {!s.is_active && <Badge variant="neutral">Отключена</Badge>}
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" onClick={() => setFormTarget(s)}>
+                  Изменить
+                </Button>
+                {s.is_active ? (
+                  <Button variant="ghost" size="sm" onClick={() => setDeactivateTarget(s)}>
+                    Отключить
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={() => activate(s)}>
+                    Включить
+                  </Button>
+                )}
+              </div>
             </div>
-            <button
-              onClick={() => toggleActive(s)}
-              className={
-                s.is_active
-                  ? "text-xs text-neutral-500 hover:text-neutral-900"
-                  : "text-xs text-red-500 hover:text-red-700"
-              }
-            >
-              {s.is_active ? "активна" : "отключена — включить"}
-            </button>
-          </div>
-        ))}
-        {services?.length === 0 && (
-          <p className="px-4 py-3 text-sm text-neutral-500">Услуг пока нет.</p>
-        )}
-      </div>
+          ))}
+        </Card>
+      )}
 
-      <form
-        onSubmit={handleSubmit}
-        className="max-w-md rounded-lg border border-neutral-200 bg-white p-4"
-      >
-        <h2 className="mb-3 text-sm font-medium text-neutral-900">Добавить услугу</h2>
-        <div className="mb-3">
-          <label className="mb-1 block text-sm text-neutral-700">Название</label>
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div className="mb-3 flex gap-3">
-          <div className="flex-1">
-            <label className="mb-1 block text-sm text-neutral-700">Длительность (мин)</label>
-            <input
-              type="number"
-              required
-              min={5}
-              max={480}
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="mb-1 block text-sm text-neutral-700">Цена (KZT)</label>
-            <input
-              type="number"
-              required
-              min={0}
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            />
-          </div>
-        </div>
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-        >
-          Добавить
-        </button>
-      </form>
+      <ServiceFormModal
+        open={formTarget !== null}
+        onClose={() => setFormTarget(null)}
+        onSaved={reload}
+        service={formTarget === "new" ? null : formTarget}
+      />
+
+      <ConfirmDialog
+        open={deactivateTarget !== null}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={deactivate}
+        title="Отключить услугу?"
+        description={
+          deactivateTarget
+            ? `«${deactivateTarget.name}» больше не будет предлагаться ассистентом и не появится в форме новой записи.`
+            : ""
+        }
+        confirmLabel="Отключить"
+        danger
+      />
     </ProtectedLayout>
   );
 }

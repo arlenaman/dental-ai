@@ -2,31 +2,50 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Input,
+  Modal,
+  PageSpinner,
+  Textarea,
+  useToast,
+} from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { FaqEntry } from "@/lib/types";
 
-export default function FaqPage() {
-  const [entries, setEntries] = useState<FaqEntry[] | null>(null);
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
+function FaqForm({
+  onClose,
+  onSaved,
+  entry,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+  entry: FaqEntry | null;
+}) {
+  const { show } = useToast();
+  const [question, setQuestion] = useState(entry?.question ?? "");
+  const [answer, setAnswer] = useState(entry?.answer ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function reload() {
-    api.get<FaqEntry[]>("/faq").then(setEntries);
-  }
-
-  useEffect(reload, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      await api.post("/faq", { question, answer });
-      setQuestion("");
-      setAnswer("");
-      reload();
+      if (entry) {
+        await api.patch(`/faq/${entry.id}`, { question, answer });
+        show("Запись обновлена", "success");
+      } else {
+        await api.post("/faq", { question, answer });
+        show("Запись добавлена", "success");
+      }
+      onSaved();
+      onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось сохранить запись");
     } finally {
@@ -34,76 +53,126 @@ export default function FaqPage() {
     }
   }
 
-  async function remove(id: string) {
-    await api.delete(`/faq/${id}`);
-    reload();
+  return (
+    <form onSubmit={handleSubmit}>
+      <Field label="Вопрос">
+        <Input
+          required
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Например: нужна ли подготовка к чистке?"
+        />
+      </Field>
+      <Field label="Ответ">
+        <Textarea required rows={3} value={answer} onChange={(e) => setAnswer(e.target.value)} />
+      </Field>
+      {error && <p className="mb-4 text-sm text-danger">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onClose}>
+          Отмена
+        </Button>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Сохраняем…" : "Сохранить"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function FaqFormModal({
+  open,
+  onClose,
+  onSaved,
+  entry,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  entry: FaqEntry | null;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={entry ? "Редактировать запись" : "Новый вопрос-ответ"}>
+      {open && <FaqForm onClose={onClose} onSaved={onSaved} entry={entry} />}
+    </Modal>
+  );
+}
+
+export default function FaqPage() {
+  const { show } = useToast();
+  const [entries, setEntries] = useState<FaqEntry[] | null>(null);
+  const [formTarget, setFormTarget] = useState<FaqEntry | null | "new">(null);
+  const [deleteTarget, setDeleteTarget] = useState<FaqEntry | null>(null);
+
+  function reload() {
+    api.get<FaqEntry[]>("/faq").then(setEntries);
+  }
+
+  useEffect(reload, []);
+
+  async function remove() {
+    if (!deleteTarget) return;
+    try {
+      await api.delete(`/faq/${deleteTarget.id}`);
+      show("Запись удалена", "success");
+      reload();
+    } catch (err) {
+      show(err instanceof ApiError ? err.message : "Не удалось удалить запись", "error");
+    }
   }
 
   return (
-    <ProtectedLayout>
-      <h1 className="mb-6 text-lg font-semibold text-neutral-900">
-        База знаний для ассистента
-      </h1>
+    <ProtectedLayout
+      title="База знаний для ассистента"
+      actions={<Button onClick={() => setFormTarget("new")}>+ Вопрос-ответ</Button>}
+    >
+      {entries === null && <PageSpinner />}
 
-      <div className="mb-8 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-        {entries?.map((e) => (
-          <div key={e.id} className="px-4 py-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-medium text-neutral-900">{e.question}</p>
-                <p className="mt-1 text-sm text-neutral-500">{e.answer}</p>
+      {entries && entries.length === 0 && (
+        <EmptyState
+          title="Записей пока нет"
+          description="Ассистент будет отвечать только тем, что знает из общих инструментов записи."
+        />
+      )}
+
+      {entries && entries.length > 0 && (
+        <Card className="divide-y divide-border">
+          {entries.map((e) => (
+            <div key={e.id} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-medium text-text">{e.question}</p>
+                  <p className="mt-1 text-sm text-text-muted">{e.answer}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <Button variant="ghost" size="sm" onClick={() => setFormTarget(e)}>
+                    Изменить
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(e)}>
+                    Удалить
+                  </Button>
+                </div>
               </div>
-              <button
-                onClick={() => remove(e.id)}
-                className="shrink-0 text-xs text-red-500 hover:text-red-700"
-              >
-                удалить
-              </button>
             </div>
-          </div>
-        ))}
-        {entries?.length === 0 && (
-          <p className="px-4 py-3 text-sm text-neutral-500">
-            Записей пока нет — ассистент будет отвечать только тем, что знает из общих
-            инструментов записи.
-          </p>
-        )}
-      </div>
+          ))}
+        </Card>
+      )}
 
-      <form
-        onSubmit={handleSubmit}
-        className="max-w-lg rounded-lg border border-neutral-200 bg-white p-4"
-      >
-        <h2 className="mb-3 text-sm font-medium text-neutral-900">Добавить вопрос-ответ</h2>
-        <div className="mb-3">
-          <label className="mb-1 block text-sm text-neutral-700">Вопрос</label>
-          <input
-            required
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            placeholder="Например: нужна ли подготовка к чистке?"
-          />
-        </div>
-        <div className="mb-3">
-          <label className="mb-1 block text-sm text-neutral-700">Ответ</label>
-          <textarea
-            required
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            rows={3}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          />
-        </div>
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-        >
-          Добавить
-        </button>
-      </form>
+      <FaqFormModal
+        open={formTarget !== null}
+        onClose={() => setFormTarget(null)}
+        onSaved={reload}
+        entry={formTarget === "new" ? null : formTarget}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={remove}
+        title="Удалить запись?"
+        description={deleteTarget ? `«${deleteTarget.question}» будет удалена без возможности восстановления.` : ""}
+        confirmLabel="Удалить"
+        danger
+      />
     </ProtectedLayout>
   );
 }

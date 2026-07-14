@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { Button, Card, Field, Input } from "@/components/ui";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -19,7 +20,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      router.replace("/conversations");
+      router.replace("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось войти");
     } finally {
@@ -28,43 +29,38 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-8 shadow-sm"
-      >
-        <h1 className="mb-1 text-xl font-semibold text-neutral-900">Dental AI</h1>
-        <p className="mb-6 text-sm text-neutral-500">Вход в панель управления клиникой</p>
+    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+      <Card className="w-full max-w-sm p-8">
+        <form onSubmit={handleSubmit}>
+          <h1 className="mb-1 text-xl font-semibold text-text">Dental AI</h1>
+          <p className="mb-6 text-sm text-text-muted">Вход в панель управления клиникой</p>
 
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Email</label>
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
-          placeholder="owner@clinic.kz"
-        />
+          <Field label="Email">
+            <Input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="owner@clinic.kz"
+            />
+          </Field>
 
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Пароль</label>
-        <input
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
-        />
+          <Field label="Пароль">
+            <Input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </Field>
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          {error && <p className="mb-4 text-sm text-danger">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-        >
-          {submitting ? "Входим…" : "Войти"}
-        </button>
-      </form>
+          <Button type="submit" disabled={submitting} className="w-full">
+            {submitting ? "Входим…" : "Войти"}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

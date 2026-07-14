@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
+import { EmptyState, PageSpinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Message } from "@/lib/types";
 
@@ -25,13 +26,16 @@ export default function ConversationDetailPage() {
   }, [params.id]);
 
   return (
-    <ProtectedLayout>
-      <Link href="/conversations" className="mb-4 inline-block text-sm text-neutral-500 hover:text-neutral-900">
+    <ProtectedLayout title="Переписка">
+      <Link
+        href="/conversations"
+        className="mb-4 inline-block text-sm text-text-muted hover:text-text"
+      >
         ← Все диалоги
       </Link>
-      <h1 className="mb-6 text-lg font-semibold text-neutral-900">Переписка</h1>
 
-      {messages === null && <p className="text-sm text-neutral-500">Загрузка…</p>}
+      {messages === null && <PageSpinner />}
+      {messages && messages.length === 0 && <EmptyState title="Сообщений пока нет" />}
 
       <div className="flex flex-col gap-3">
         {messages?.map((m) => (
@@ -39,16 +43,16 @@ export default function ConversationDetailPage() {
             key={m.id}
             className={
               m.direction === "inbound"
-                ? "mr-auto max-w-lg rounded-lg rounded-bl-none bg-white border border-neutral-200 px-4 py-2"
-                : "ml-auto max-w-lg rounded-lg rounded-br-none bg-neutral-900 text-white px-4 py-2"
+                ? "mr-auto max-w-lg rounded-lg rounded-bl-none border border-border bg-surface px-4 py-2"
+                : "ml-auto max-w-lg rounded-lg rounded-br-none bg-accent px-4 py-2 text-accent-fg"
             }
           >
             <p className="whitespace-pre-wrap text-sm">{m.body}</p>
             <p
               className={
                 m.direction === "inbound"
-                  ? "mt-1 text-xs text-neutral-400"
-                  : "mt-1 text-xs text-neutral-300"
+                  ? "mt-1 text-xs text-text-muted"
+                  : "mt-1 text-xs text-accent-fg/70"
               }
             >
               {formatTime(m.created_at)}
