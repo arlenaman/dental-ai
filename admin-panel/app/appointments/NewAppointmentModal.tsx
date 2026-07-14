@@ -27,8 +27,13 @@ function AppointmentForm({
 
   const [phone, setPhone] = useState("");
   const [fullName, setFullName] = useState("");
-  const [serviceId, setServiceId] = useState(activeServices[0]?.id ?? "");
-  const [staffId, setStaffId] = useState(activeStaff[0]?.id ?? "");
+  // "" means "no explicit user choice yet" — fall back to the first active
+  // option every render instead of freezing a possibly-still-empty list at
+  // mount time (services/staff can still be loading when the modal opens).
+  const [serviceIdChoice, setServiceIdChoice] = useState("");
+  const [staffIdChoice, setStaffIdChoice] = useState("");
+  const serviceId = serviceIdChoice || (activeServices[0]?.id ?? "");
+  const staffId = staffIdChoice || (activeStaff[0]?.id ?? "");
   const [date, setDate] = useState(defaultDate);
   const [slots, setSlots] = useState<string[] | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -93,7 +98,7 @@ function AppointmentForm({
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Услуга">
-          <Select value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+          <Select value={serviceId} onChange={(e) => setServiceIdChoice(e.target.value)}>
             {activeServices.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name} · {s.duration_minutes} мин
@@ -102,7 +107,7 @@ function AppointmentForm({
           </Select>
         </Field>
         <Field label="Врач">
-          <Select value={staffId} onChange={(e) => setStaffId(e.target.value)}>
+          <Select value={staffId} onChange={(e) => setStaffIdChoice(e.target.value)}>
             {activeStaff.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.full_name}
