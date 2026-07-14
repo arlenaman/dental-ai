@@ -9,6 +9,12 @@ export interface Staff {
   is_active: boolean;
 }
 
+export const ROLE_LABELS: Record<StaffRole, string> = {
+  owner: "Владелец",
+  admin: "Администратор",
+  dentist: "Врач",
+};
+
 export interface Service {
   id: string;
   name: string;
@@ -52,6 +58,36 @@ export interface Message {
   body: string;
   created_at: string;
 }
+
+export interface Patient {
+  id: string;
+  full_name: string;
+  phone: string;
+  preferred_language: string;
+}
+
+export type AppointmentStatus = "scheduled" | "cancelled" | "completed" | "no_show";
+
+export interface AppointmentListItem {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  patient_phone: string;
+  staff_id: string;
+  staff_name: string;
+  service_id: string;
+  service_name: string;
+  starts_at: string;
+  ends_at: string;
+  status: AppointmentStatus;
+}
+
+export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
+  scheduled: "Запланирована",
+  cancelled: "Отменена",
+  completed: "Завершена",
+  no_show: "Не пришёл",
+};
 
 export const WEEKDAY_LABELS = [
   "Понедельник",
