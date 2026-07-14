@@ -1,6 +1,6 @@
 import uuid
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.staff import StaffRole
 
@@ -24,3 +24,15 @@ class StaffOut(BaseModel):
     is_active: bool
 
     model_config = {"from_attributes": True}
+
+
+class StaffCreate(BaseModel):
+    full_name: str = Field(min_length=1, max_length=255)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
+    role: StaffRole = StaffRole.DENTIST
+
+
+class StaffUpdate(BaseModel):
+    role: StaffRole | None = None
+    is_active: bool | None = None

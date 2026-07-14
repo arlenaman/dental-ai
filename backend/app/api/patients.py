@@ -1,6 +1,7 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_staff
@@ -11,6 +12,21 @@ from app.schemas.patient import PatientCreate, PatientOut
 from app.services.patients import find_or_create_patient as find_or_create_patient_service
 
 router = APIRouter(prefix="/patients", tags=["patients"])
+
+
+@router.get("", response_model=list[PatientOut])
+async def list_patients(
+    search: str | None = Query(default=None),
+    current_staff: Staff = Depends(get_current_staff),
+    db: AsyncSession = Depends(get_db),
+) -> list[Patient]:
+    stmt = select(Patient).where(Patient.clinic_id == current_staff.clinic_id)
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(or_(Patient.full_name.ilike(pattern), Patient.phone.ilike(pattern)))
+    stmt = stmt.order_by(Patient.full_name).limit(200)
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 
 @router.post("", response_model=PatientOut, status_code=status.HTTP_201_CREATED)

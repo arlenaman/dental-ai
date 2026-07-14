@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_access_token
 from app.db.session import get_db
-from app.models.staff import Staff
+from app.models.staff import Staff, StaffRole
 
 bearer_scheme = HTTPBearer()
 
@@ -33,3 +33,12 @@ async def get_current_staff(
         raise credentials_error
 
     return staff
+
+
+async def require_admin(current_staff: Staff = Depends(get_current_staff)) -> Staff:
+    if current_staff.role not in (StaffRole.OWNER, StaffRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для этого действия",
+        )
+    return current_staff

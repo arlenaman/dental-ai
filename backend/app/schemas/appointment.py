@@ -27,3 +27,17 @@ class AppointmentOut(BaseModel):
     status: AppointmentStatus
 
     model_config = {"from_attributes": True}
+
+
+class AppointmentListOut(BaseModel):
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    patient_name: str
+    patient_phone: str
+    staff_id: uuid.UUID
+    staff_name: str
+    service_id: uuid.UUID
+    service_name: str
+    starts_at: datetime
+    ends_at: datetime
+    status: AppointmentStatus
